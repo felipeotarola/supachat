@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PowerChat - Real-time Chat Application
 
-## Getting Started
+PowerChat is a modern, real-time chat application built with Next.js, Supabase, and Vercel. It features user authentication, real-time messaging, and image sharing capabilities.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- User authentication (signup, login, logout)
+- Real-time messaging
+- Image upload and sharing
+- Responsive design
+- Dark mode UI
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Tech Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Frontend**: Next.js 13 (App Router), React, TypeScript
+- **Backend**: Supabase (Authentication, Database, Real-time subscriptions)
+- **Styling**: Tailwind CSS
+- **UI Components**: shadcn/ui
+- **Image Storage**: Vercel Blob
+- **Deployment**: Vercel
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Prerequisites
 
-## Learn More
+Before you begin, ensure you have the following installed on your local machine:
 
-To learn more about Next.js, take a look at the following resources:
+- Node.js (v14.x or later)
+- npm (v6.x or later)
+- Git
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+You'll also need accounts with the following services:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- [Supabase](https://supabase.com/)
+- [Vercel](https://vercel.com/)
 
-## Deploy on Vercel
+## Environment Variables
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+BLOB_READ_WRITE_TOKEN
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+To run this project, you will need to add the following environment variables to your `.env.local` file:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
