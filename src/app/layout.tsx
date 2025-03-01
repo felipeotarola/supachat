@@ -12,7 +12,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-      <CopilotKit publicApiKey="<your-copilot-cloud-public-api-key>"> 
+      <CopilotKit runtimeUrl="/api/copilotkit"> 
 
         {children}
         <Toaster />

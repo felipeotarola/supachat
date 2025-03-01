@@ -11,6 +11,7 @@
   "dependencies": {
     "@copilotkit/react-core": "^1.6.0",
     "@copilotkit/react-ui": "^1.6.0",
+    "@copilotkit/runtime": "^1.6.0",
     "@radix-ui/react-slot": "^1.1.2",
     "@supabase/supabase-js": "^2.49.1",
     "@vercel/blob": "^0.27.2",
