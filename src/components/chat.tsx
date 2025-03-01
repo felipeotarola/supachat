@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Send, ImageIcon } from "lucide-react"
 import { toast, Toaster } from "sonner"
 import { CopilotKitCSSProperties, CopilotSidebar } from "@copilotkit/react-ui"
+import { useCopilotReadable } from "@copilotkit/react-core"; 
 
 type Message = {
     id: string
@@ -24,6 +25,26 @@ export default function Chat({ user }: { user: any }) {
     const [uploading, setUploading] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    const [colleagues, setColleagues] = useState([
+        { id: 1, name: "John Doe", role: "Developer" },
+        { id: 2, name: "Jane Smith", role: "Designer" },
+        { id: 3, name: "Bob Wilson", role: "Product Manager" }
+      ]);
+     
+      // Define Copilot readable state
+      useCopilotReadable({
+        description: "The current user's colleagues",
+        value: colleagues,
+      });
+
+        // Define Copilot readable state for messages
+  useCopilotReadable({
+    description: "The current public chat messages from supabase",
+    value: messages,
+  });
+
+
 
     useEffect(() => {
         const fetchMessages = async () => {
@@ -178,7 +199,7 @@ export default function Chat({ user }: { user: any }) {
                                             )}
                                         </div>
                                         <span className="text-xs text-gray-500 mt-1">
-                                            {msg.user_id === user.id ? "You" : "User"} • {new Date(msg.created_at).toLocaleTimeString()}
+                                            {msg.user_id === user.id ? user.id: "User"} • {new Date(msg.created_at).toLocaleTimeString()}
                                         </span>
                                     </div>
                                 ))
