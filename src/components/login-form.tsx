@@ -97,14 +97,7 @@ export default function LoginForm() {
                     </Link>
                 </div>
 
-                <div className="flex items-center justify-center space-x-2 text-gray-400">
-                    <span>Powered by</span>
-                    <img
-                        src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Supabase_wordmark_dark-1qYmpCiDfeOHLrbsNfqcmhcXYkVLO1.svg"
-                        alt="Supabase"
-                        className="h-5 dark:invert"
-                    />
-                </div>
+              
             </form>
         </div>
     )
