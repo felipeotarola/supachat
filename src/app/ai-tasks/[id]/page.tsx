@@ -1,0 +1,125 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useParams } from "next/navigation"
+import { supabase } from "@/utils/supabase"
+import { toast } from "sonner"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Skeleton } from "@/components/ui/skeleton"
+
+export default function AITasks() {
+  const { id } = useParams() // Get the task id from the URL
+  const [task, setTask] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchTask = async () => {
+      setLoading(true)
+      try {
+        const { data, error } = await supabase.from("ai_tasks").select("*").eq("id", id).single()
+        if (error) throw error
+        setTask(data)
+      } catch (error) {
+        console.error("Error fetching AI task:", error)
+        toast.error("Failed to load AI task. Please try again.")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (id) {
+      fetchTask()
+    }
+  }, [id])
+
+  if (loading) {
+    return (
+      <div className="space-y-6 p-4 bg-[#121212] text-white min-h-screen">
+        <h1 className="text-2xl font-bold text-white">AI Task Details</h1>
+        <div className="space-y-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!task) {
+    return <div className="p-4 bg-[#121212] text-white min-h-screen">No task found for id: {id}</div>
+  }
+
+  return (
+    <div className="space-y-6 p-4 bg-[#121212] text-white min-h-screen">
+      <h1 className="text-2xl font-bold text-white">AI Task Details</h1>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[200px]">Property</TableHead>
+            <TableHead>Value</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow>
+            <TableCell className="font-medium">ID</TableCell>
+            <TableCell>{task.id}</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell className="font-medium">User ID</TableCell>
+            <TableCell>{task.user_id}</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell className="font-medium">Task Type</TableCell>
+            <TableCell>{task.task_type}</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell className="font-medium">Parameters</TableCell>
+            <TableCell>
+              <pre className="whitespace-pre-wrap rounded bg-[#222222] p-2 text-sm">
+                {JSON.stringify(task.parameters, null, 2)}
+              </pre>
+            </TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell className="font-medium">Result</TableCell>
+            <TableCell>
+              <pre className="whitespace-pre-wrap rounded bg-[#222222] p-2 text-sm">
+                {JSON.stringify(task.result, null, 2)}
+              </pre>
+            </TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell className="font-medium">Status</TableCell>
+            <TableCell>
+              <span
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                  task.status === "completed"
+                    ? "bg-[#4D8B76]/20 text-[#4D8B76]"
+                    : task.status === "failed"
+                      ? "bg-red-900/20 text-red-400"
+                      : "bg-gray-800/40 text-gray-400"
+                }`}
+              >
+                {task.status}
+              </span>
+            </TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell className="font-medium">Created At</TableCell>
+            <TableCell>{new Date(task.created_at).toLocaleString()}</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell className="font-medium">Updated At</TableCell>
+            <TableCell>{new Date(task.updated_at).toLocaleString()}</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </div>
+  )
+}
+

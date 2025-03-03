@@ -1,7 +1,6 @@
 "use client";
 
-import type React from "react";
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "@/utils/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +17,13 @@ interface CalendarMeetingCardProps {
   meetingName?: string;
 }
 
+interface ShareMeetingInfo {
+  date: string;
+  time: string;
+  meetingName?: string;
+  aiTaskLink?: string;
+}
+
 // Loading component for calendar actions
 const LoadingView = () => (
   <div className="flex items-center justify-center p-4">
@@ -27,10 +33,16 @@ const LoadingView = () => (
 );
 
 // Calendar meeting card component
-const CalendarMeetingCardComponent = ({ date, time, meetingName }: CalendarMeetingCardProps) => {
+const CalendarMeetingCardComponent = ({
+  date,
+  time,
+  meetingName,
+}: CalendarMeetingCardProps) => {
   return (
     <div className="bg-[#2a2a2a] p-4 rounded-lg border border-gray-700">
-      <h3 className="text-white font-medium mb-2">{meetingName || "Meeting"}</h3>
+      <h3 className="text-white font-medium mb-2">
+        {meetingName || "Meeting"}
+      </h3>
       <div className="text-gray-300 text-sm">
         <div>Date: {date}</div>
         <div>Time: {time}</div>
@@ -40,50 +52,81 @@ const CalendarMeetingCardComponent = ({ date, time, meetingName }: CalendarMeeti
 };
 
 type Message = {
-    id: string;
-    user_id: string;
-    content: string;
-    created_at: string;
-    image_url?: string;
-    profiles?: {
-      username?: string;
-    };
+  id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  image_url?: string;
+  profiles?: {
+    username?: string;
   };
+};
+
 export default function Chat({ user }: { user: any }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [aiTaskId, setAiTaskId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [colleagues, setColleagues] = useState([
-    { id: 1, name: "John Doe", role: "Developer" },
-    { id: 2, name: "Jane Smith", role: "Designer" },
-    { id: 3, name: "Bob Wilson", role: "Product Manager" },
-  ]);
+  // Function to share meeting in the public chat (includes the AI task link if available)
+const handleShareMeeting = async (meetingInfo: ShareMeetingInfo) => {
+  const { date, time, meetingName, aiTaskLink } = meetingInfo;
+  const content = `Shared meeting: ${meetingName || "Meeting"} scheduled for ${date} at ${time}${
+    aiTaskLink
+      ? `. See details: <a href="${aiTaskLink}" target="_blank" class="text-blue-500 underline">View Task</a>`
+      : ""
+  }`;
+  try {
+    const { error } = await supabase.from("messages").insert({
+      user_id: "79bc8b52-cc41-4846-bd28-ffef93bc2614",
+      content,
+    });
+    if (error) throw error;
+    toast.success("Meeting shared successfully!");
+  } catch (err) {
+    console.error("Error sharing meeting: ", err);
+    toast.error("Failed to share meeting. Please try again.");
+  }
+};
 
-  // Function to handle sharing meeting to chat
-  const handleShareMeeting = async (meetingInfo: { date: string; time: string; meetingName?: string }) => {
-    const { date, time, meetingName } = meetingInfo;
-    const content = `Shared meeting: ${meetingName || "Meeting"} scheduled for ${date} at ${time}`;
+
+  // Function to save the Copilot action response to the AI table in Supabase.
+  // It saves the response and returns the inserted task's id.
+  const handleSaveAICopilotResponse = async (meetingInfo: {
+    date?: string;
+    time?: string;
+    meetingName?: string;
+  }) => {
     try {
-      const { error } = await supabase.from("messages").insert({
-        user_id: "79bc8b52-cc41-4846-bd28-ffef93bc2614",
-        content,
-      });
+      const { data, error } = await supabase
+        .from("ai_tasks")
+        .insert({
+          user_id: user.id, // Using the logged-in user's id
+          task_type: "showCalendarMeeting", // The task type associated with this action
+          parameters: meetingInfo, // Store the meeting details as parameters
+          result: meetingInfo, // You can adjust this if the result differs from the parameters
+          status: "completed", // Mark as completed (adjust status logic as needed)
+        })
+        .select(); // Returning the inserted row(s)
       if (error) throw error;
-      toast.success("Meeting shared successfully!");
-    } catch (err) {
-      console.error("Error sharing meeting: ", err);
-      toast.error("Failed to share meeting. Please try again.");
+      if (data && data.length > 0) {
+        const insertedTask = data[0];
+        setAiTaskId(insertedTask.id);
+        toast.success("AI response saved successfully.");
+        return insertedTask.id;
+      }
+    } catch (error) {
+      console.error("Error saving AI response:", error);
+      toast.error("Failed to save AI response. Please try again.");
     }
   };
 
   useCopilotAction({
     name: "showCalendarMeeting",
     description: "Displays calendar meeting information",
-  
     parameters: [
       {
         name: "date",
@@ -106,37 +149,43 @@ export default function Chat({ user }: { user: any }) {
     ],
     render: ({ status, args }) => {
       const { date, time, meetingName } = args;
-  
-      if (status === 'inProgress') {
-        return <LoadingView />; // Your own component for loading state
+
+      // Use a ref to ensure we save the response only once per trigger
+      const hasSavedResponse = useRef(false);
+      if (status !== "inProgress" && !hasSavedResponse.current) {
+        handleSaveAICopilotResponse({ date, time, meetingName });
+        hasSavedResponse.current = true;
+      }
+
+      if (status === "inProgress") {
+        return <LoadingView />; // Loading state while processing
       } else {
         const meetingProps: CalendarMeetingCardProps = {
           date: date || "No date specified",
           time: time || "No time specified",
           meetingName,
         };
-  
+
         return (
           <div>
             <CalendarMeetingCardComponent {...meetingProps} />
-            <Button onClick={() => handleShareMeeting({ 
-              date: date || "No date specified", 
-              time: time || "No time specified", 
-              meetingName 
-            })}>
+            <Button
+              onClick={() =>
+                handleShareMeeting({
+                  date: date || "No date specified",
+                  time: time || "No time specified",
+                  meetingName,
+                  // Construct the link if the AI task has been saved
+                  aiTaskLink: aiTaskId ? `/ai-tasks/${aiTaskId}` : undefined,
+                })
+              }
+            >
               Share with group
             </Button>
           </div>
         );
       }
     },
-  });
-  
-
-  // Define Copilot readable state
-  useCopilotReadable({
-    description: "The current user's colleagues",
-    value: colleagues,
   });
 
   // Define Copilot readable state for messages
@@ -303,35 +352,40 @@ export default function Chat({ user }: { user: any }) {
                 </p>
               ) : (
                 messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex flex-col ${
-                      msg.user_id === user.id ? "items-end" : "items-start"
-                    }`}
-                  >
                     <div
-                      className={`max-w-[80%] rounded-lg p-3 ${
-                        msg.user_id === user.id
-                          ? "bg-[#2b725e] text-white"
-                          : "bg-[#2a2a2a] text-white"
+                      key={msg.id}
+                      className={`flex flex-col ${
+                        msg.user_id === user.id ? "items-end" : "items-start"
                       }`}
                     >
-                      {msg.image_url ? (
-                        <img
-                          src={msg.image_url || "/placeholder.svg"}
-                          alt="Shared image"
-                          className="max-w-full h-auto rounded"
-                        />
-                      ) : (
-                        <p className="text-sm">{msg.content}</p>
-                      )}
+                      <div
+                        className={`max-w-[80%] rounded-lg p-3 ${
+                          msg.user_id === user.id
+                            ? "bg-[#2b725e] text-white"
+                            : "bg-[#2a2a2a] text-white"
+                        }`}
+                      >
+                        {msg.image_url ? (
+                          <img
+                            src={msg.image_url || "/placeholder.svg"}
+                            alt="Shared image"
+                            className="max-w-full h-auto rounded"
+                          />
+                        ) : (
+                          // Render HTML content as clickable using dangerouslySetInnerHTML
+                          <div
+                            className="text-sm"
+                            dangerouslySetInnerHTML={{ __html: msg.content }}
+                          />
+                        )}
+                      </div>
+                      <span className="text-xs text-gray-500 mt-1">
+                        {msg.profiles?.username || msg.user_id} •{" "}
+                        {new Date(msg.created_at).toLocaleTimeString()}
+                      </span>
                     </div>
-                    <span className="text-xs text-gray-500 mt-1">
-                    {msg.profiles?.username || msg.user_id} • {" "}
-                    {new Date(msg.created_at).toLocaleTimeString()}
-                    </span>
-                  </div>
-                ))
+                  ))
+                  
               )}
               <div ref={messagesEndRef} />
             </div>
