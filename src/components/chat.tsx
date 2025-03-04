@@ -9,8 +9,9 @@ import { toast, Toaster } from "sonner";
 import { CopilotKitCSSProperties, CopilotSidebar } from "@copilotkit/react-ui";
 import { useCopilotReadable } from "@copilotkit/react-core";
 import { useCopilotAction } from "@copilotkit/react-core";
+import { LoadingView } from "./loading-view";
+import { CalendarMeetingCardComponent } from "./calendar-meeting-card";
 
-// Calendar meeting props interface
 interface CalendarMeetingCardProps {
   date: string;
   time: string;
@@ -24,33 +25,6 @@ interface ShareMeetingInfo {
   aiTaskLink?: string;
 }
 
-// Loading component for calendar actions
-const LoadingView = () => (
-  <div className="flex items-center justify-center p-4">
-    <div className="animate-spin h-6 w-6 border-2 border-[#2b725e] rounded-full border-t-transparent"></div>
-    <span className="ml-2 text-white">Loading...</span>
-  </div>
-);
-
-// Calendar meeting card component
-const CalendarMeetingCardComponent = ({
-  date,
-  time,
-  meetingName,
-}: CalendarMeetingCardProps) => {
-  return (
-    <div className="bg-[#2a2a2a] p-4 rounded-lg border border-gray-700">
-      <h3 className="text-white font-medium mb-2">
-        {meetingName || "Meeting"}
-      </h3>
-      <div className="text-gray-300 text-sm">
-        <div>Date: {date}</div>
-        <div>Time: {time}</div>
-      </div>
-    </div>
-  );
-};
-
 type Message = {
   id: string;
   user_id: string;
@@ -62,39 +36,42 @@ type Message = {
   };
 };
 
+
 export default function Chat({ user }: { user: any }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [aiTaskId, setAiTaskId] = useState<string | null>(null);
+  // New state for image preview and file selection
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Function to share meeting in the public chat (includes the AI task link if available)
-const handleShareMeeting = async (meetingInfo: ShareMeetingInfo) => {
-  const { date, time, meetingName, aiTaskLink } = meetingInfo;
-  const content = `Shared meeting: ${meetingName || "Meeting"} scheduled for ${date} at ${time}${
-    aiTaskLink
-      ? `. See details: <a href="${aiTaskLink}" target="_blank" class="text-blue-500 underline">View Task</a>`
-      : ""
-  }`;
-  try {
-    const { error } = await supabase.from("messages").insert({
-      user_id: "79bc8b52-cc41-4846-bd28-ffef93bc2614",
-      content,
-    });
-    if (error) throw error;
-    toast.success("Meeting shared successfully!");
-  } catch (err) {
-    console.error("Error sharing meeting: ", err);
-    toast.error("Failed to share meeting. Please try again.");
-  }
-};
+  const handleShareMeeting = async (meetingInfo: ShareMeetingInfo) => {
+    const { date, time, meetingName, aiTaskLink } = meetingInfo;
+    const content = `Shared meeting: ${
+      meetingName || "Meeting"
+    } scheduled for ${date} at ${time}${
+      aiTaskLink
+        ? `. See details: <a href="${aiTaskLink}" target="_blank" class="text-blue-500 underline">View Task</a>`
+        : ""
+    }`;
+    try {
+      const { error } = await supabase.from("messages").insert({
+        user_id: "79bc8b52-cc41-4846-bd28-ffef93bc2614",
+        content,
+      });
+      if (error) throw error;
+      toast.success("Meeting shared successfully!");
+    } catch (err) {
+      console.error("Error sharing meeting: ", err);
+      toast.error("Failed to share meeting. Please try again.");
+    }
+  };
 
-
-  // Function to save the Copilot action response to the AI table in Supabase.
-  // It saves the response and returns the inserted task's id.
   const handleSaveAICopilotResponse = async (meetingInfo: {
     date?: string;
     time?: string;
@@ -104,13 +81,13 @@ const handleShareMeeting = async (meetingInfo: ShareMeetingInfo) => {
       const { data, error } = await supabase
         .from("ai_tasks")
         .insert({
-          user_id: user.id, // Using the logged-in user's id
-          task_type: "showCalendarMeeting", // The task type associated with this action
-          parameters: meetingInfo, // Store the meeting details as parameters
-          result: meetingInfo, // You can adjust this if the result differs from the parameters
-          status: "completed", // Mark as completed (adjust status logic as needed)
+          user_id: user.id,
+          task_type: "showCalendarMeeting",
+          parameters: meetingInfo,
+          result: meetingInfo,
+          status: "completed",
         })
-        .select(); // Returning the inserted row(s)
+        .select();
       if (error) throw error;
       if (data && data.length > 0) {
         const insertedTask = data[0];
@@ -149,23 +126,19 @@ const handleShareMeeting = async (meetingInfo: ShareMeetingInfo) => {
     ],
     render: ({ status, args }) => {
       const { date, time, meetingName } = args;
-
-      // Use a ref to ensure we save the response only once per trigger
       const hasSavedResponse = useRef(false);
       if (status !== "inProgress" && !hasSavedResponse.current) {
         handleSaveAICopilotResponse({ date, time, meetingName });
         hasSavedResponse.current = true;
       }
-
       if (status === "inProgress") {
-        return <LoadingView />; // Loading state while processing
+        return <LoadingView />;
       } else {
         const meetingProps: CalendarMeetingCardProps = {
           date: date || "No date specified",
           time: time || "No time specified",
           meetingName,
         };
-
         return (
           <div>
             <CalendarMeetingCardComponent {...meetingProps} />
@@ -175,7 +148,6 @@ const handleShareMeeting = async (meetingInfo: ShareMeetingInfo) => {
                   date: date || "No date specified",
                   time: time || "No time specified",
                   meetingName,
-                  // Construct the link if the AI task has been saved
                   aiTaskLink: aiTaskId ? `/ai-tasks/${aiTaskId}` : undefined,
                 })
               }
@@ -188,7 +160,6 @@ const handleShareMeeting = async (meetingInfo: ShareMeetingInfo) => {
     },
   });
 
-  // Define Copilot readable state for messages
   useCopilotReadable({
     description: "The current public chat messages from supabase",
     value: messages,
@@ -201,9 +172,7 @@ const handleShareMeeting = async (meetingInfo: ShareMeetingInfo) => {
           .from("messages")
           .select("*, profiles ( username )")
           .order("created_at", { ascending: true });
-
         if (error) throw error;
-
         setMessages(data || []);
       } catch (error) {
         console.error("Error fetching messages:", error);
@@ -238,15 +207,12 @@ const handleShareMeeting = async (meetingInfo: ShareMeetingInfo) => {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() && !uploading) return;
-
     try {
       const { error } = await supabase.from("messages").insert({
         user_id: user.id,
         content: newMessage,
       });
-
       if (error) throw error;
-
       setNewMessage("");
     } catch (error) {
       console.error("Error sending message:", error);
@@ -254,17 +220,23 @@ const handleShareMeeting = async (meetingInfo: ShareMeetingInfo) => {
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // New function to handle file selection and show preview.
+  const handleFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setSelectedImage(file);
+    const preview = URL.createObjectURL(file);
+    setPreviewUrl(preview);
+  };
 
+  // Function to upload the image after preview is confirmed.
+  const handleSendImage = async () => {
+    if (!selectedImage) return;
     setUploading(true);
-
     try {
-      const filename = `${Date.now()}-${file.name}`;
+      const filename = `${Date.now()}-${selectedImage.name}`;
       const formData = new FormData();
-      formData.append("file", file);
-
+      formData.append("file", selectedImage);
       const response = await fetch(
         `/api/upload-image?filename=${encodeURIComponent(filename)}`,
         {
@@ -272,10 +244,8 @@ const handleShareMeeting = async (meetingInfo: ShareMeetingInfo) => {
           body: formData,
         }
       );
-
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.indexOf("application/json") !== -1) {
-        // Response is JSON
         const data = await response.json();
         if (!response.ok) {
           throw new Error(
@@ -285,18 +255,14 @@ const handleShareMeeting = async (meetingInfo: ShareMeetingInfo) => {
         if (!data.url) {
           throw new Error("Image URL not found in the response");
         }
-
         const { error } = await supabase.from("messages").insert({
           user_id: user.id,
           content: "Sent an image",
           image_url: data.url,
         });
-
         if (error) throw error;
-
         toast.success("Image uploaded successfully.");
       } else {
-        // Response is not JSON
         const text = await response.text();
         throw new Error(`Unexpected response: ${text.substring(0, 100)}...`);
       }
@@ -309,6 +275,9 @@ const handleShareMeeting = async (meetingInfo: ShareMeetingInfo) => {
       );
     } finally {
       setUploading(false);
+      // Clear preview and selected file
+      setSelectedImage(null);
+      setPreviewUrl(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -330,21 +299,17 @@ const handleShareMeeting = async (meetingInfo: ShareMeetingInfo) => {
       >
         <CopilotSidebar
           defaultOpen={true}
-          instructions={
-            "You are assisting the user as best as you can. Answer in the best way possible given the data you have."
-          }
+          instructions="You are assisting the user as best as you can. Answer in the best way possible given the data you have."
           labels={{
             title: "Sidebar Assistant",
             initial: "How can I help you today?",
           }}
         >
           <Toaster />
-
           <div className="flex flex-col h-[500px] w-full max-w-md bg-[#1c1c1c] rounded-lg overflow-hidden border border-gray-800">
             <div className="p-4 bg-[#232323] border-b border-gray-800">
               <h2 className="text-xl font-semibold text-white">Public Chat</h2>
             </div>
-
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {messages.length === 0 ? (
                 <p className="text-gray-400 text-center">
@@ -352,43 +317,74 @@ const handleShareMeeting = async (meetingInfo: ShareMeetingInfo) => {
                 </p>
               ) : (
                 messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex flex-col ${
+                      msg.user_id === user.id ? "items-end" : "items-start"
+                    }`}
+                  >
                     <div
-                      key={msg.id}
-                      className={`flex flex-col ${
-                        msg.user_id === user.id ? "items-end" : "items-start"
+                      className={`max-w-[80%] rounded-lg p-3 ${
+                        msg.user_id === user.id
+                          ? "bg-[#2b725e] text-white"
+                          : "bg-[#2a2a2a] text-white"
                       }`}
                     >
-                      <div
-                        className={`max-w-[80%] rounded-lg p-3 ${
-                          msg.user_id === user.id
-                            ? "bg-[#2b725e] text-white"
-                            : "bg-[#2a2a2a] text-white"
-                        }`}
-                      >
-                        {msg.image_url ? (
-                          <img
-                            src={msg.image_url || "/placeholder.svg"}
-                            alt="Shared image"
-                            className="max-w-full h-auto rounded"
-                          />
-                        ) : (
-                          // Render HTML content as clickable using dangerouslySetInnerHTML
-                          <div
-                            className="text-sm"
-                            dangerouslySetInnerHTML={{ __html: msg.content }}
-                          />
-                        )}
-                      </div>
-                      <span className="text-xs text-gray-500 mt-1">
-                        {msg.profiles?.username || msg.user_id} •{" "}
-                        {new Date(msg.created_at).toLocaleTimeString()}
-                      </span>
+                      {msg.image_url ? (
+                        <img
+                          src={msg.image_url || "/placeholder.svg"}
+                          alt="Shared image"
+                          className="max-w-full h-auto rounded"
+                        />
+                      ) : (
+                        <div
+                          className="text-sm"
+                          dangerouslySetInnerHTML={{ __html: msg.content }}
+                        />
+                      )}
                     </div>
-                  ))
-                  
+                    <span className="text-xs text-gray-500 mt-1">
+                      {msg.profiles?.username || msg.user_id} •{" "}
+                      {new Date(msg.created_at).toLocaleTimeString()}
+                    </span>
+                  </div>
+                ))
               )}
               <div ref={messagesEndRef} />
             </div>
+            {/* Display image preview if available */}
+            {previewUrl && (
+  <div className="p-4 border-t border-gray-800">
+    <p className="text-white mb-2">Image Preview:</p>
+    <img
+      src={previewUrl}
+      alt="Preview"
+      className="w-22 h-auto rounded mb-2" // Added a fixed width class
+    />
+    <div className="flex gap-2">
+      <Button
+        onClick={handleSendImage}
+        disabled={uploading}
+        className="bg-[#2b725e] hover:bg-[#235e4c]"
+      >
+        {uploading ? "Uploading..." : "Send Image"}
+      </Button>
+      <Button
+        onClick={() => {
+          // Cancel preview
+          setSelectedImage(null);
+          setPreviewUrl(null);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+          }
+        }}
+        className="bg-red-500 hover:bg-red-600"
+      >
+        Cancel
+      </Button>
+    </div>
+  </div>
+)}
 
             <form
               onSubmit={handleSendMessage}
@@ -403,7 +399,7 @@ const handleShareMeeting = async (meetingInfo: ShareMeetingInfo) => {
               <input
                 type="file"
                 accept="image/*"
-                onChange={handleImageUpload}
+                onChange={handleFileSelection}
                 className="hidden"
                 ref={fileInputRef}
               />
