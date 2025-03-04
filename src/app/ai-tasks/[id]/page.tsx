@@ -14,10 +14,45 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 
+// Simple iOS detection.
+function isIOS() {
+  if (typeof window === "undefined") return false;
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
+// Function to upload ICS content using your provided API route.
+async function uploadICSFile(icsContent: string, fileName: string) {
+  // Create a File object from the ICS content.
+  const file = new File([icsContent], fileName, {
+    type: "text/calendar;charset=utf-8",
+  });
+  const formData = new FormData();
+  // Append file as an attachment.
+  formData.append("attachments", file);
+  // Append a dummy message. (Your API route uses messages; adjust as needed.)
+  formData.append("messages", JSON.stringify({ content: "Calendar event ICS" }));
+
+  const response = await fetch("/api/upload", {
+    method: "POST",
+    body: formData,
+  });
+  if (!response.ok) {
+    throw new Error("Upload failed");
+  }
+  const data = await response.json();
+  // Expect your API route to return { success: true, url: publicUrl }
+  return data.url;
+}
+
 export default function AITasks() {
   const { id } = useParams(); // Get the task id from the URL
   const [task, setTask] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  // Toggle for using native calendar (e.g. webcal://) vs. download.
+  const [useNativeCalendar, setUseNativeCalendar] = useState(false);
 
   useEffect(() => {
     const fetchTask = async () => {
@@ -48,27 +83,25 @@ export default function AITasks() {
     return date.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
   };
 
-  // Handler to generate and download the ICS file
-  const handleAddToCalendar = () => {
-    // Our actual fields are date, time, meetingName, meetingContext
+  // Generate ICS content from task parameters.
+  const generateICSContent = () => {
+    // Expected fields: date, time, meetingName, meetingContext.
     const { date, time, meetingName, meetingContext } = task.parameters || {};
 
-    // Check if we have the minimal required fields
     if (!date || !time || !meetingName) {
       toast.error("Missing event details in task parameters.");
-      return;
+      return null;
     }
 
-    // Combine date + time into a JavaScript Date
     const startDateTime = new Date(`${date}T${time}`);
-    // Add 1 hour for the end time (adjust as needed)
+    // Set end time to 1 hour later (adjust as needed).
     const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000);
 
     const dtStart = formatDateForICS(startDateTime);
     const dtEnd = formatDateForICS(endDateTime);
-    const uid = task.id; // or generate a random UID
+    const uid = task.id; // Use task id as UID.
 
-    // Build ICS content
+    // Build ICS content.
     const icsContent = `BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//Your Company//Your App//EN
@@ -82,17 +115,43 @@ DESCRIPTION:${meetingContext || ""}
 END:VEVENT
 END:VCALENDAR`;
 
-    // Create a blob and trigger the download
-    const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    // Use the meeting name for the file name
-    a.download = `${meetingName.replace(/\s+/g, "_")}.ics`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    return icsContent;
+  };
+
+  // Handler for adding the event to the calendar.
+  const handleAddToCalendar = async () => {
+    const icsContent = generateICSContent();
+    if (!icsContent) return;
+
+    // Use meetingName for the filename.
+    const fileName = `${(task.parameters.meetingName || "event")
+      .replace(/\s+/g, "_")}.ics`;
+
+    // If user selected native calendar and device is iOS, use the API route to upload ICS.
+    if (useNativeCalendar && isIOS()) {
+      try {
+        const publicICSUrl = await uploadICSFile(icsContent, fileName);
+        // Convert the returned public URL to webcal://
+        const webcalUrl = publicICSUrl.replace(/^https?:\/\//, "webcal://");
+        window.location.href = webcalUrl;
+      } catch (error) {
+        console.error("Error uploading ICS file:", error);
+        toast.error("Unable to add event to calendar.");
+      }
+    } else {
+      // Otherwise, fallback to downloading the ICS file locally.
+      const blob = new Blob([icsContent], {
+        type: "text/calendar;charset=utf-8",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
   };
 
   if (loading) {
@@ -124,6 +183,19 @@ END:VCALENDAR`;
   return (
     <div className="space-y-6 p-4 bg-[#121212] text-white min-h-screen">
       <h1 className="text-2xl font-bold text-white">AI Task Details</h1>
+      {/* Switch UI for selecting calendar option */}
+      <div className="flex items-center space-x-2">
+        <label htmlFor="calendarSwitch" className="text-sm">
+          Use Native Calendar (iOS)
+        </label>
+        <input
+          id="calendarSwitch"
+          type="checkbox"
+          checked={useNativeCalendar}
+          onChange={(e) => setUseNativeCalendar(e.target.checked)}
+          className="cursor-pointer"
+        />
+      </div>
       <Table>
         <TableHeader>
           <TableRow>
@@ -186,6 +258,7 @@ END:VCALENDAR`;
           </TableRow>
         </TableBody>
       </Table>
+
       {/* Conditionally render the "Add to Calendar" button if the task type is showCalendarMeeting */}
       {task.task_type === "showCalendarMeeting" && (
         <button
