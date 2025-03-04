@@ -15,13 +15,15 @@ import { CalendarMeetingCardComponent } from "./calendar-meeting-card";
 interface CalendarMeetingCardProps {
   date: string;
   time: string;
-  meetingName?: string;
+  meetingName: string;
+  meetingContext: string;
 }
 
 interface ShareMeetingInfo {
   date: string;
   time: string;
-  meetingName?: string;
+  meetingName: string;
+  meetingContext: string;
   aiTaskLink?: string;
 }
 
@@ -35,7 +37,6 @@ type Message = {
     username?: string;
   };
 };
-
 
 export default function Chat({ user }: { user: any }) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -76,6 +77,7 @@ export default function Chat({ user }: { user: any }) {
     date?: string;
     time?: string;
     meetingName?: string;
+    meetingContext?: string;
   }) => {
     try {
       const { data, error } = await supabase
@@ -121,14 +123,20 @@ export default function Chat({ user }: { user: any }) {
         name: "meetingName",
         type: "string",
         description: "Name of the meeting",
-        required: false,
+        required: true,
       },
+      {
+        name: "meetingContext",
+        type: "string",
+        description: "Context of the meeting",
+        required: true,
+      }
     ],
     render: ({ status, args }) => {
-      const { date, time, meetingName } = args;
+      const { date, time, meetingName, meetingContext } = args;
       const hasSavedResponse = useRef(false);
       if (status !== "inProgress" && !hasSavedResponse.current) {
-        handleSaveAICopilotResponse({ date, time, meetingName });
+        handleSaveAICopilotResponse({ date, time, meetingName, meetingContext });
         hasSavedResponse.current = true;
       }
       if (status === "inProgress") {
@@ -137,7 +145,8 @@ export default function Chat({ user }: { user: any }) {
         const meetingProps: CalendarMeetingCardProps = {
           date: date || "No date specified",
           time: time || "No time specified",
-          meetingName,
+          meetingName: meetingName || "No meeting name specified",
+          meetingContext: meetingContext || "No context specified",
         };
         return (
           <div>
@@ -147,7 +156,8 @@ export default function Chat({ user }: { user: any }) {
                 handleShareMeeting({
                   date: date || "No date specified",
                   time: time || "No time specified",
-                  meetingName,
+                  meetingName: meetingName || "No meeting name specified",
+                  meetingContext: meetingContext || "No context specified",
                   aiTaskLink: aiTaskId ? `/ai-tasks/${aiTaskId}` : undefined,
                 })
               }
@@ -354,37 +364,37 @@ export default function Chat({ user }: { user: any }) {
             </div>
             {/* Display image preview if available */}
             {previewUrl && (
-  <div className="p-4 border-t border-gray-800">
-    <p className="text-white mb-2">Image Preview:</p>
-    <img
-      src={previewUrl}
-      alt="Preview"
-      className="w-22 h-auto rounded mb-2" // Added a fixed width class
-    />
-    <div className="flex gap-2">
-      <Button
-        onClick={handleSendImage}
-        disabled={uploading}
-        className="bg-[#2b725e] hover:bg-[#235e4c]"
-      >
-        {uploading ? "Uploading..." : "Send Image"}
-      </Button>
-      <Button
-        onClick={() => {
-          // Cancel preview
-          setSelectedImage(null);
-          setPreviewUrl(null);
-          if (fileInputRef.current) {
-            fileInputRef.current.value = "";
-          }
-        }}
-        className="bg-red-500 hover:bg-red-600"
-      >
-        Cancel
-      </Button>
-    </div>
-  </div>
-)}
+              <div className="p-4 border-t border-gray-800">
+                <p className="text-white mb-2">Image Preview:</p>
+                <img
+                  src={previewUrl}
+                  alt="Preview"
+                  className="w-22 h-auto rounded mb-2" // Added a fixed width class
+                />
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleSendImage}
+                    disabled={uploading}
+                    className="bg-[#2b725e] hover:bg-[#235e4c]"
+                  >
+                    {uploading ? "Uploading..." : "Send Image"}
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      // Cancel preview
+                      setSelectedImage(null);
+                      setPreviewUrl(null);
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = "";
+                      }
+                    }}
+                    className="bg-red-500 hover:bg-red-600"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <form
               onSubmit={handleSendMessage}
